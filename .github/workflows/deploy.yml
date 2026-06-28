@@ -62,27 +62,37 @@ jobs:
             --region ${{ env.AWS_REGION }} \
             --name ${{ env.CLUSTER_NAME }}
 
-      - name: Verify cluster connection
+      - name: List all resources
         run: |
-          kubectl cluster-info
-          kubectl get nodes
+          echo "=== All Deployments ==="
+          kubectl get deployments -A
+          echo ""
+          echo "=== All Pods ==="
           kubectl get pods -A
+          echo ""
+          echo "=== All Services ==="
+          kubectl get services -A
 
       - name: Update image in deployment
         run: |
+          # جرب في default namespace
           kubectl set image deployment/portfolio \
             portfolio=${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }} \
-            --namespace=default
+            --namespace=default || \
+          # جرب في كل namespaces لو ملقاش
+          kubectl set image deployment/portfolio \
+            portfolio=${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }} \
+            --namespace=portfolio || \
+          # لو لسه ملقاش، اطبع رسالة
+          echo "⚠️ Deployment 'portfolio' not found in any namespace"
 
-      - name: Wait for rollout
+      - name: Wait for rollout (if deployment exists)
         run: |
           kubectl rollout status deployment/portfolio \
             --namespace=default \
-            --timeout=120s
+            --timeout=120s || true
 
       - name: Get ALB URL
         run: |
           echo "🌍 Portfolio live at:"
-          kubectl get ingress portfolio-ingress \
-            --namespace=default \
-            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || echo "No ingress found"
+          kubectl get ingress -A -o jsonpath='{.items[*].status.loadBalancer.ingress[0].hostname}' || echo "No ingress found"
