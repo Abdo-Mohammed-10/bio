@@ -15,7 +15,7 @@ jobs:
   build-and-push:
     name: Build & Push to ECR
     runs-on: ubuntu-latest
-    environment: sec bio    # 👈 ربط بالبيئة
+    environment: "sec bio"
 
     steps:
       - name: Checkout code
@@ -43,7 +43,7 @@ jobs:
     name: Deploy to EKS
     runs-on: ubuntu-latest
     needs: build-and-push
-    environment: sec bio    # 👈 ربط بالبيئة
+    environment: "sec bio"
 
     steps:
       - name: Checkout code
@@ -57,22 +57,33 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Update kubeconfig
+        uses: aws-actions/aws-eks-update-kubeconfig@v1
+        with:
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          region: ${{ env.AWS_REGION }}
+          kubeconfig: ${{ github.workspace }}/.kube/config
+
+      - name: Verify cluster connection
         run: |
-          aws eks update-kubeconfig \
-            --region ${{ env.AWS_REGION }} \
-            --name ${{ env.CLUSTER_NAME }}
+          kubectl cluster-info
+          kubectl get nodes
+          kubectl get pods -A
 
       - name: Update image in deployment
         run: |
           kubectl set image deployment/portfolio \
-            portfolio=${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}
+            portfolio=${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }} \
+            --namespace=default
 
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/portfolio --timeout=120s
+          kubectl rollout status deployment/portfolio \
+            --namespace=default \
+            --timeout=120s
 
       - name: Get ALB URL
         run: |
           echo "🌍 Portfolio live at:"
           kubectl get ingress portfolio-ingress \
-            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+            --namespace=default \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || echo "No ingress found"
