@@ -1,0 +1,24 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Terraform state — مش يترفع أبداً فيه secrets
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/*.tfvars
+
+# Windows junk
+*.Zone.Identifier
+
+# OS
+.DS_Store.terraform/
+*.exe
+.terraform/
+*.exe
+*.dll
+.venv/
+__pycache__/
+node_modules/

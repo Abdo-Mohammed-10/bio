@@ -1,0 +1,50 @@
+# deployment.yaml
+# بيشغّل 2 نسخة من الموقع على EKS
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portfolio
+  namespace: default
+  labels:
+    app: portfolio
+spec:
+  replicas: 2        # نسختين — لو واحدة وقعت التانية شغالة
+  selector:
+    matchLabels:
+      app: portfolio
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # زود نسخة وقت الـ deploy
+      maxUnavailable: 0  # zero downtime
+  template:
+    metadata:
+      labels:
+        app: portfolio
+    spec:
+      containers:
+        - name: portfolio
+          image: 816131439167.dkr.ecr.eu-central-1.amazonaws.com/abdo/portfolio
+          # ↑ هتتغير أوتوماتيك من GitHub Actions
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu:    "50m"
+              memory: "64Mi"
+            limits:
+              cpu:    "100m"
+              memory: "128Mi"
+          livenessProbe:   # K8s بيتأكد إن الـ container شغال
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:  # قبل ما يبدأ يستقبل traffic
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5

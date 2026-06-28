@@ -1,0 +1,16 @@
+# service.yaml
+# بيعمل internal endpoint للـ pods
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: portfolio-svc
+  namespace: default
+spec:
+  type: ClusterIP   # internal فقط — الـ Ingress هو اللي بيكشف للخارج
+  selector:
+    app: portfolio
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

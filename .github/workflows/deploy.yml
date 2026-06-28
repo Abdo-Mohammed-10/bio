@@ -1,0 +1,80 @@
+name: Deploy Portfolio
+
+# شتغل أوتوماتيك لما تعمل push على main
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION:    ${{ secrets.AWS_REGION }}
+  ECR_REPO:      ${{ secrets.ECR_REPOSITORY_URL }}
+  CLUSTER_NAME:  portfolio-cluster
+  IMAGE_TAG:     ${{ github.sha }}  # كل deploy بـ tag فريد
+
+jobs:
+  # ── Job 1: Build & Push ─────────────────────────
+  build-and-push:
+    name: Build & Push to ECR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push Docker image
+        run: |
+          docker build -t $ECR_REPO:$IMAGE_TAG .
+          docker tag $ECR_REPO:$IMAGE_TAG $ECR_REPO:latest
+          docker push $ECR_REPO:$IMAGE_TAG
+          docker push $ECR_REPO:latest
+
+  # ── Job 2: Deploy to EKS ────────────────────────
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: build-and-push  # ينتظر الـ build يخلص
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name $CLUSTER_NAME
+
+      - name: Update image in deployment
+        run: |
+          kubectl set image deployment/portfolio \
+            portfolio=$ECR_REPO:$IMAGE_TAG
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/portfolio \
+            --timeout=120s
+
+      - name: Get ALB URL
+        run: |
+          echo "🌍 Portfolio live at:"
+          kubectl get ingress portfolio-ingress \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
