@@ -57,11 +57,10 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Update kubeconfig
-        uses: aws-actions/aws-eks-update-kubeconfig@v1
-        with:
-          cluster-name: ${{ env.CLUSTER_NAME }}
-          region: ${{ env.AWS_REGION }}
-          kubeconfig: ${{ github.workspace }}/.kube/config
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ env.CLUSTER_NAME }}
 
       - name: Verify cluster connection
         run: |
